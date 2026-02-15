@@ -9,8 +9,14 @@
   <body>
     <main class="container">
       <h1>インベーダーゲーム</h1>
-      <p class="help">← → で移動 / スペースで発射 / Enter でリスタート</p>
+      <p class="help">PC: ← → 移動 / Space 発射 / Enter 再開 ・ スマホ: 画面下ボタンで操作</p>
       <canvas id="game" width="640" height="480" aria-label="インベーダーゲームの画面"></canvas>
+      <div class="touch-controls" aria-label="スマホ操作ボタン">
+        <button id="btn-left" class="control-btn" type="button">◀</button>
+        <button id="btn-fire" class="control-btn fire" type="button">発射</button>
+        <button id="btn-right" class="control-btn" type="button">▶</button>
+        <button id="btn-restart" class="control-btn restart" type="button">再開</button>
+      </div>
     </main>
     <script src="script.js"></script>
   </body>

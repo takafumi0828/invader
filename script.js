@@ -1,5 +1,9 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const leftButton = document.getElementById("btn-left");
+const rightButton = document.getElementById("btn-right");
+const fireButton = document.getElementById("btn-fire");
+const restartButton = document.getElementById("btn-restart");
 
 const game = {
   width: canvas.width,
@@ -28,6 +32,18 @@ const player = {
 const bullets = [];
 const enemyBullets = [];
 let enemies = [];
+let shields = [];
+
+const ufo = {
+  active: false,
+  x: 0,
+  y: 22,
+  width: 42,
+  height: 18,
+  speed: 130,
+  direction: 1,
+  spawnTimer: 0,
+};
 
 function resetEnemies() {
   enemies = [];
@@ -51,6 +67,54 @@ function resetEnemies() {
   }
 }
 
+function resetShields() {
+  shields = [];
+  const shieldCount = 4;
+  const shieldWidth = 74;
+  const shieldHeight = 34;
+  const y = player.y - 72;
+  const spacing = (game.width - shieldCount * shieldWidth) / (shieldCount + 1);
+
+  for (let i = 0; i < shieldCount; i += 1) {
+    shields.push({
+      x: spacing + i * (shieldWidth + spacing),
+      y,
+      width: shieldWidth,
+      height: shieldHeight,
+      hp: 7,
+      maxHp: 7,
+    });
+  }
+}
+
+function spawnUfo() {
+  if (ufo.active) return;
+  ufo.active = true;
+  ufo.direction = Math.random() > 0.5 ? 1 : -1;
+  ufo.x = ufo.direction === 1 ? -ufo.width : game.width + ufo.width;
+}
+
+function updateUfo(deltaTime) {
+  ufo.spawnTimer -= deltaTime;
+
+  if (!ufo.active && ufo.spawnTimer <= 0) {
+    spawnUfo();
+    ufo.spawnTimer = 10 + Math.random() * 6;
+  }
+
+  if (!ufo.active) return;
+
+  ufo.x += ufo.direction * ufo.speed * deltaTime;
+
+  if (ufo.direction === 1 && ufo.x > game.width + ufo.width) {
+    ufo.active = false;
+  }
+
+  if (ufo.direction === -1 && ufo.x + ufo.width < -ufo.width) {
+    ufo.active = false;
+  }
+}
+
 const enemyState = {
   direction: 1,
   speed: 30,
@@ -70,7 +134,10 @@ function restartGame() {
   enemyState.direction = 1;
   enemyState.speed = 30;
   enemyState.shootTimer = 0;
+  ufo.active = false;
+  ufo.spawnTimer = 3;
   resetEnemies();
+  resetShields();
 }
 
 function nextLevel() {
@@ -79,7 +146,9 @@ function nextLevel() {
   enemyState.direction = 1;
   bullets.length = 0;
   enemyBullets.length = 0;
+  ufo.active = false;
   resetEnemies();
+  resetShields();
 }
 
 function endGame(text) {
@@ -121,10 +190,26 @@ function enemyShoot(deltaTime) {
     y: shooter.y + shooter.height,
     width: 4,
     height: 10,
-    speed: 180 + game.level * 10,
+    speed: 120 + game.level * 6,
   });
 
-  enemyState.shootTimer = Math.max(0.25, 1.2 - game.level * 0.1);
+  enemyState.shootTimer = Math.max(0.7, 2.1 - game.level * 0.08);
+}
+
+function damageShield(projectile, damage = 1) {
+  for (let si = shields.length - 1; si >= 0; si -= 1) {
+    const shield = shields[si];
+    if (shield.hp <= 0) continue;
+
+    if (isColliding(projectile, shield)) {
+      shield.hp -= damage;
+      if (shield.hp <= 0) {
+        shield.hp = 0;
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 function update(deltaTime) {
@@ -149,8 +234,23 @@ function update(deltaTime) {
   });
 
   for (let i = bullets.length - 1; i >= 0; i -= 1) {
-    if (bullets[i].y + bullets[i].height < 0) {
+    const bullet = bullets[i];
+
+    if (bullet.y + bullet.height < 0) {
       bullets.splice(i, 1);
+      continue;
+    }
+
+    if (damageShield(bullet)) {
+      bullets.splice(i, 1);
+      continue;
+    }
+
+    if (ufo.active && isColliding(bullet, ufo)) {
+      bullets.splice(i, 1);
+      ufo.active = false;
+      game.score += 100;
+      continue;
     }
   }
 
@@ -158,6 +258,11 @@ function update(deltaTime) {
     const bullet = enemyBullets[i];
 
     if (bullet.y > game.height) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    if (damageShield(bullet)) {
       enemyBullets.splice(i, 1);
       continue;
     }
@@ -176,6 +281,10 @@ function update(deltaTime) {
 
     if (enemy.x <= 8 || enemy.x + enemy.width >= game.width - 8) {
       hitEdge = true;
+    }
+
+    if (damageShield(enemy, 0.015 * game.level)) {
+      // 敵がシールドに触れて削る
     }
   });
 
@@ -211,6 +320,7 @@ function update(deltaTime) {
   }
 
   enemyShoot(deltaTime);
+  updateUfo(deltaTime);
 }
 
 function drawPlayer() {
@@ -228,6 +338,31 @@ function drawEnemies() {
     ctx.fillRect(enemy.x + 5, enemy.y + 6, 5, 5);
     ctx.fillRect(enemy.x + enemy.width - 10, enemy.y + 6, 5, 5);
   });
+}
+
+function drawShields() {
+  shields.forEach((shield) => {
+    if (shield.hp <= 0) return;
+
+    const lifeRatio = shield.hp / shield.maxHp;
+    const green = Math.floor(180 * lifeRatio + 40);
+    const red = Math.floor(140 - 80 * lifeRatio);
+
+    ctx.fillStyle = `rgb(${red}, ${green}, 125)`;
+    ctx.fillRect(shield.x, shield.y, shield.width, shield.height);
+
+    ctx.fillStyle = "rgba(15, 24, 18, 0.35)";
+    ctx.fillRect(shield.x + shield.width / 2 - 8, shield.y + shield.height - 12, 16, 12);
+  });
+}
+
+function drawUfo() {
+  if (!ufo.active) return;
+
+  ctx.fillStyle = "#ff4d4d";
+  ctx.fillRect(ufo.x, ufo.y + 5, ufo.width, ufo.height - 5);
+  ctx.fillStyle = "#ffc2c2";
+  ctx.fillRect(ufo.x + 8, ufo.y, ufo.width - 16, 8);
 }
 
 function drawBullets() {
@@ -261,8 +396,10 @@ function drawHud() {
 
 function draw() {
   ctx.clearRect(0, 0, game.width, game.height);
-  drawPlayer();
+  drawUfo();
   drawEnemies();
+  drawShields();
+  drawPlayer();
   drawBullets();
   drawHud();
 }
@@ -276,6 +413,44 @@ function gameLoop(timestamp) {
 
   requestAnimationFrame(gameLoop);
 }
+
+
+function bindHoldButton(button, onDown, onUp) {
+  const release = () => onUp();
+
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    onDown();
+  });
+
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("pointerleave", release);
+}
+
+bindHoldButton(leftButton, () => {
+  keys.left = true;
+}, () => {
+  keys.left = false;
+});
+
+bindHoldButton(rightButton, () => {
+  keys.right = true;
+}, () => {
+  keys.right = false;
+});
+
+fireButton.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  shootPlayerBullet();
+});
+
+restartButton.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  if (!game.running) {
+    restartGame();
+  }
+});
 
 window.addEventListener("keydown", (event) => {
   if (event.code === "ArrowLeft") keys.left = true;

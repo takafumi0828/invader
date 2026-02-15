@@ -14,6 +14,7 @@ body {
 
 .container {
   text-align: center;
+  width: min(720px, 96vw);
 }
 
 .help {
@@ -26,4 +27,50 @@ canvas {
   border-radius: 8px;
   box-shadow: 0 0 32px rgba(84, 119, 255, 0.25);
   background: #05070f;
+  width: min(640px, 96vw);
+  height: auto;
+}
+
+.touch-controls {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(64px, 1fr));
+  gap: 10px;
+}
+
+.control-btn {
+  appearance: none;
+  border: 1px solid #6e7da2;
+  background: linear-gradient(180deg, #2a3552, #1a2238);
+  color: #eef2ff;
+  border-radius: 10px;
+  min-height: 52px;
+  font-size: 18px;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+
+.control-btn:active {
+  transform: translateY(1px);
+  filter: brightness(1.1);
+}
+
+.fire {
+  background: linear-gradient(180deg, #5c2d4f, #3a1d33);
+}
+
+.restart {
+  grid-column: 1 / -1;
+  min-height: 44px;
+  font-size: 16px;
+}
+
+@media (min-width: 769px) {
+  .touch-controls {
+    grid-template-columns: repeat(4, minmax(80px, 1fr));
+  }
+
+  .restart {
+    grid-column: auto;
+  }
 }
